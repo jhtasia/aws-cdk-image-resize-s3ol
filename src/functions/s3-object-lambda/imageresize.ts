@@ -57,7 +57,7 @@ const responseImage = async (InputS3Params: S3Params, imageBuffer: Buffer, conte
 };
 
 const responseError = async (InputS3Params: S3Params, code: number) =>
-  await InputS3Params.S3Instence.writeGetObjectResponse({
+  InputS3Params.S3Instence.writeGetObjectResponse({
     StatusCode: code,
     RequestRoute: InputS3Params.RequestRoute,
     RequestToken: InputS3Params.RequestToken,
@@ -115,7 +115,7 @@ const putImageToBucket = async (
   imageBuffer: Buffer,
   prefix: string,
   w: Number,
-  format: string
+  format: string,
 ) => {
   try {
     const s = sharp(imageBuffer, { animated: true });
