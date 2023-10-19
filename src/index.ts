@@ -1,6 +1,5 @@
 import { Duration, Stack, Token } from 'aws-cdk-lib';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
-import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -16,8 +15,8 @@ export interface IImageResizeProps {
   s3Bucket?: s3.IBucket;
   s3BucketProps?: s3.BucketProps;
   cloudfrontDistributionProps?: DistributionProps;
-  project: string;
-  s3Prefix: string;
+  project?: string;
+  s3Prefix?: string;
 }
 
 export class ImageResize extends Construct {
@@ -26,23 +25,23 @@ export class ImageResize extends Construct {
   readonly project: string;
   readonly s3Prefix: string;
 
-  constructor(scope: Construct, id: string, props: IImageResizeProps) {
+  constructor(scope: Construct, id: string, props?: IImageResizeProps) {
     super(scope, id);
-    this.project = props.project;
-    this.s3Prefix = props.s3Prefix;
-    const { s3BucketProps, cloudfrontDistributionProps } = props;
+    this.project = props?.project ?? '';
+    this.s3Prefix = props?.s3Prefix ?? '';
+    const { s3BucketProps, cloudfrontDistributionProps } = props || {};;
 
     const account = Stack.of(this).account;
     const region = Stack.of(this).region;
 
-    this.imagesBucket = props.s3Bucket ?? new s3.Bucket(this, 'Bucket', s3BucketProps);
+    this.imagesBucket = props?.s3Bucket ?? new s3.Bucket(this, 'Bucket', s3BucketProps);
     const s3ObjectLambdaFunc = new NodejsFunction(this, 'ImageResizeFunction', {
       runtime: lambda.Runtime.NODEJS_14_X,
       entry: `${__dirname}/functions/s3-object-lambda/imageresize.ts`,
       depsLockFilePath: `${__dirname}/functions/s3-object-lambda/yarn.lock`,
       bundling: {
         minify: true,
-        nodeModules: ['sharp', 'node-fetch'],
+        nodeModules: ['sharp', 'node-fetch', '@aws-sdk/client-s3'],
         forceDockerBundling: true,
       },
       timeout: Duration.minutes(1),
@@ -64,7 +63,7 @@ export class ImageResize extends Construct {
             's3:DataAccessPointAccount': account,
           },
         },
-      })
+      }),
     );
 
     s3ObjectLambdaFunc.role?.attachInlinePolicy(
@@ -79,7 +78,7 @@ export class ImageResize extends Construct {
             resources: ['*'],
           }),
         ],
-      })
+      }),
     );
 
     s3ObjectLambdaFunc.addPermission('AllowCloudFrontInvoke', {
@@ -133,7 +132,7 @@ export class ImageResize extends Construct {
             },
           ],
         },
-      }
+      },
     );
 
     const cloudfrontFunctionCodeOptions: cloudfront.FileCodeOptions = {
@@ -161,8 +160,8 @@ export class ImageResize extends Construct {
         cachePolicy: cachePolicy,
         origin: new S3ObjectLambdaOrigin(
           `${Token.asString(
-            objectLambdaAccessPoint.getAtt('Alias.Value')
-          )}.s3.${region}.amazonaws.com`
+            objectLambdaAccessPoint.getAtt('Alias.Value'),
+          )}.s3.${region}.amazonaws.com`,
         ),
         functionAssociations: [
           {
@@ -222,7 +221,7 @@ export class ImageResize extends Construct {
 
     (this.distribution.node.defaultChild as cloudfront.CfnDistribution).addPropertyOverride(
       'DistributionConfig.Origins.0.OriginAccessControlId',
-      originAccessControl.attrId
+      originAccessControl.attrId,
     );
   }
 }
